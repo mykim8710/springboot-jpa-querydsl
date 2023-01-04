@@ -15,3 +15,14 @@
 - Dependencies: **Spring Web**, **Lombok**, **Spring Data JPA**, **H2 Database**
 - DB : H2 database
 
+- [Study 내용] 
+
+- Querydsl 기본문법
+  - JPQL Basic vs Querydsl Basic
+  - 기본 Q-Type 활용
+  - 검색 조건 쿼리
+  - 결과 조회
+  - 정렬
+  - 페이징
+  - 집합(sum, max, min, count, group by, having....)
+  - 
