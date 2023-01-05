@@ -6,6 +6,11 @@ import com.example.querydsl.entity.QTeam;
 import com.example.querydsl.entity.Team;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Expression;
+import com.querydsl.core.types.dsl.CaseBuilder;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +22,8 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.PersistenceUnit;
 
 import java.util.List;
 
@@ -28,6 +35,10 @@ import static com.example.querydsl.entity.QTeam.team;
 public class QuerydslBasicTest {
     @Autowired
     EntityManager em;
+
+    @PersistenceUnit
+    EntityManagerFactory emf;
+
 
     JPAQueryFactory queryFactory;
 
@@ -315,6 +326,308 @@ public class QuerydslBasicTest {
         Assertions.assertThat(teamA.get(member.age.avg())).isEqualTo(15);
         Assertions.assertThat(teamB.get(team.name)).isEqualTo("TeamB");
         Assertions.assertThat(teamB.get(member.age.avg())).isEqualTo(35);
+    }
+
+
+    /**
+     *팀A에 소속된 모든 회원
+     */
+    @Test
+    @DisplayName("querydsl_기본조인_Test")
+    void querydsl_기본조인_Test() {
+        List<Member> result = queryFactory
+                                .selectFrom(member)
+                                .join(member.team, team)
+                                .where(team.name.eq("TeamA"))
+                                .fetch();
+
+        System.out.println("result = " + result);
+
+        Assertions.assertThat(result)
+                            .extracting("username")
+                            .containsExactly("member1", "member2");
+    }
+
+
+    /**
+     * 세타 조인(연관관계가 없는 필드로 조인)
+     * 회원의 이름이 팀 이름과 같은 회원 조회
+     */
+    @Test
+    @DisplayName("querydsl_세타조인_Test")
+    void querydsl_세타조인_Test() {
+        em.persist(new Member("TeamA"));
+        em.persist(new Member("TeamB"));
+
+        List<Member> result = queryFactory
+                                .select(member)
+                                .from(member, team)
+                                .where(member.username.eq(team.name))
+                                .fetch();
+
+        System.out.println("result = " + result);
+
+        Assertions.assertThat(result)
+                .extracting("username")
+                .containsExactly("TeamA", "TeamB");
+    }
+
+
+    /**
+     * 1. 조인 대상 필터링
+     * 예) 회원과 팀을 조인하면서, 팀 이름이 teamA인 팀만 조인, 회원은 모두 조회
+     * JPQL: SELECT m, t FROM Member m LEFT JOIN m.team t on t.name = 'TeamA'
+     * SQL: SELECT m.*, t.* FROM Member m LEFT JOIN Team t ON m.TEAM_ID = t.id AND t.name='TeamA'
+     */
+    @Test
+    @DisplayName("querydsl_조인_ON절_필터링_Test")
+    void querydsl_조인_ON절_필터링_Test() {
+        List<Tuple> result = queryFactory
+                                .select(member, team)
+                                .from(member)
+                                .leftJoin(member.team, team).on(team.name.eq("TeamA"))
+                                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+
+
+    /**
+     * 2. 연관관계 없는 엔티티 외부 조인
+     * 예) 회원의 이름과 팀의 이름이 같은 대상 외부 조인
+     * JPQL: SELECT m, t FROM Member m LEFT JOIN Team t on m.username = t.name
+     * SQL: SELECT m.*, t.* FROM Member m LEFT JOIN Team t ON m.username = t.name */
+    @Test
+    @DisplayName("querydsl_조인_관계없는_엔티티_외부조인_Test")
+    void querydsl_조인_관계없는_엔티티_외부조인_Test() {
+        em.persist(new Member("TeamA"));
+        em.persist(new Member("TeamB"));
+
+        List<Tuple> result = queryFactory
+                                .select(member, team)
+                                .from(member)
+                                .leftJoin(team).on(member.username.eq(team.name))
+                                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+
+    @Test
+    @DisplayName("querydsl_페치조인_미적용_Test")
+    void querydsl_페치조인_미적용_Test() {
+        // 영속성 컨텍스트 db반영, 초기화
+        em.flush();
+        em.clear();
+
+        Member findMember = queryFactory
+                                .selectFrom(member)
+                                .where(member.username.eq("member1"))
+                                .fetchOne();
+
+        //System.out.println(findMember.getTeam().getName()); // 지연로딩
+
+        boolean loaded = emf.getPersistenceUnitUtil().isLoaded(findMember.getTeam());// Team의 로딩여부 확인
+        System.out.println("loaded = " + loaded);
+        Assertions.assertThat(loaded).as("페치 조인 미적용").isFalse();
+    }
+
+    @Test
+    @DisplayName("querydsl_페치조인_적용_Test")
+    void querydsl_페치조인_적용_Test() {
+        // 영속성 컨텍스트 db반영, 초기화
+        em.flush();
+        em.clear();
+
+        Member findMember = queryFactory
+                                .selectFrom(member)
+                                .join(member.team, team).fetchJoin()
+                                .where(member.username.eq("member1"))
+                                .fetchOne();
+
+        boolean loaded = emf.getPersistenceUnitUtil().isLoaded(findMember.getTeam());// Team의 로딩여부 확인
+        System.out.println("loaded = " + loaded);
+        Assertions.assertThat(loaded).as("페치 조인 적용").isTrue();
+    }
+
+    /**
+     * 나이가 가장 많은 회원 조회
+     */
+    @Test
+    @DisplayName("querydsl_서브쿼리_eq_Test")
+    void querydsl_서브쿼리_eq_Test() {
+        QMember memberSub = new QMember("memberSub");   // 서브쿼리용
+
+        List<Member> result = queryFactory
+                                    .selectFrom(member)
+                                    .where(member.age.eq(
+                                            JPAExpressions
+                                                    .select(memberSub.age.max())
+                                                    .from(memberSub)
+                                    ))
+                                    .fetch();
+        System.out.println("result = " + result);
+
+        Assertions.assertThat(result).extracting("age").containsExactly(40);
+    }
+
+    /**
+     * 나이가 평균나이 이상인 회원
+     */
+    @Test
+    @DisplayName("querydsl_서브쿼리_goe(greater or equal)_Test")
+    void querydsl_서브쿼리_goe_Test() {
+        QMember memberSub = new QMember("memberSub");   // 서브쿼리용
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .where(member.age.goe(
+                        JPAExpressions
+                                .select(memberSub.age.avg())
+                                .from(memberSub)
+                ))
+                .fetch();
+        System.out.println("result = " + result);
+
+        Assertions.assertThat(result).extracting("age").containsExactly(30, 40);
+    }
+
+
+    /**
+     * 서브쿼리 여러 건 처리, in 사용
+     **/
+    @Test
+    @DisplayName("querydsl_서브쿼리_in_Test")
+    void querydsl_서브쿼리_in_Test() {
+        QMember memberSub = new QMember("memberSub");   // 서브쿼리용
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .where(member.age.in(
+                        JPAExpressions
+                                .select(memberSub.age)
+                                .from(memberSub)
+                                .where(memberSub.age.gt(10))
+                ))
+                .fetch();
+        System.out.println("result = " + result);
+
+        Assertions.assertThat(result).extracting("age").containsExactly(20, 30, 40);
+    }
+
+    /**
+     * select 절에 subquery
+     **/
+    @Test
+    @DisplayName("querydsl_서브쿼리_select절_Test")
+    void querydsl_서브쿼리_select절_Test() {
+        QMember memberSub = new QMember("memberSub");   // 서브쿼리용
+
+        List<Tuple> tuples = queryFactory
+                                .select(member.username,
+                                        JPAExpressions
+                                                .select(memberSub.age.avg())
+                                                .from(memberSub)
+                                ).from(member)
+                                .fetch();
+
+        for (Tuple tuple : tuples) {
+            System.out.println("member.username = " + tuple.get(member.username));
+            System.out.println("memberSub.age.avg = " +tuple.get(JPAExpressions.select(memberSub.age.avg()).from(memberSub)));
+        }
+    }
+
+    @Test
+    @DisplayName("querydsl_case문_단순한조건_Test")
+    void querydsl_case문_단순한조건_Test() {
+        List<String> result = queryFactory.select(member.age
+                                                    .when(10).then("열살")
+                                                    .when(20).then("스무살")
+                                                    .when(30).then("서른살")
+                                                    .otherwise("마흔살").as("나이한글표기"))
+                                            .from(member)
+                                            .fetch();
+        System.out.println("result = " + result);
+
+        for (String s : result) {
+            System.out.println("나이 = " + s);
+        }
+    }
+
+    @Test
+    @DisplayName("querydsl_case문_복잡한조건_Test")
+    void querydsl_case문_복잡한조건_Test() {
+        List<String> result = queryFactory.select(new CaseBuilder()
+                                                    .when(member.age.between(0,20)).then("0 ~ 20살")
+                                                    .when(member.age.between(21,30)).then("21 ~ 30살")
+                                                    .otherwise("기타"))
+                                            .from(member)
+                                            .fetch();
+
+        System.out.println("result = " + result);
+
+        for (String s : result) {
+            System.out.println("나이 = " + s);
+        }
+    }
+
+    /**
+     * orderBy에서 Case 문 함께 사용하기 예제
+     * 예를 들어서 다음과 같은 임의의 순서로 회원을 출력하고 싶다면?
+     * 1. 0 ~ 30살이 아닌 회원을 가장 먼저 출력 == 40살을 가장 먼저 출력
+     * 2. 0 ~ 20살 회원 출력
+     * 3. 21 ~ 30살 회원 출력
+     */
+    @Test
+    @DisplayName("querydsl_case문_orderby_Test")
+    void querydsl_case문_orderby_Test() {
+        NumberExpression<Integer> rankPath = new CaseBuilder()
+                                                    .when(member.age.between(0, 20)).then(2)
+                                                    .when(member.age.between(21, 30)).then(1)
+                                                    .otherwise(3);
+
+        List<Tuple> result = queryFactory
+                                .select(member.username, member.age, rankPath)
+                                .from(member)
+                                .orderBy(rankPath.desc())   // 내림차순 3,2,1....
+                                .fetch();
+        System.out.println("result = " + result);
+
+        for (Tuple tuple : result) {
+            String username = tuple.get(member.username);
+            Integer age = tuple.get(member.age);
+            Integer rank = tuple.get(rankPath);
+
+            System.out.println("username = " + username + " age = " + age + " rank = " + rank);
+        }
+    }
+
+    @Test
+    @DisplayName("querydsl_상수처리_Test")
+    void querydsl_상수처리_Test() {
+        Tuple result = queryFactory
+                        .select(member.username, Expressions.constant("CONSTANT"))
+                        .from(member)
+                        .fetchFirst();
+
+        System.out.println("result = " + result);
+    }
+
+    @Test
+    @DisplayName("querydsl_문자더하기_Test")
+    void querydsl_문자더하기_Test() {
+
+        List<String> result = queryFactory
+                                .select(member.username.concat("_").concat(member.age.stringValue()))
+                                .from(member)
+                                .fetch();
+
+        for (String s : result) {
+            System.out.println("s = " + s);
+        }
     }
 
 
