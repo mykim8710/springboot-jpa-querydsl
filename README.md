@@ -32,5 +32,18 @@
   - 서브 쿼리
   - Case 문
   - 상수, 문자 더하기
+  - distinct
 
--
+- Querydsl 중급문법
+  - 프로젝션과 결과반환 
+    - 기본
+    - DTO 조회
+      - 프로퍼티(setter) 접근, 필드 직접 접근, 생성자 사용
+    - @QueryProjection : 생성자 + @QueryProjection
+  - 동적 쿼리
+    - BooleanBuilder
+    - Where 다중 파라미터
+  - 수정, 삭제 벌크 연산
+  - SQL function 호출
+
+- 

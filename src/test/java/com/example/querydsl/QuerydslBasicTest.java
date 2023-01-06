@@ -1,12 +1,19 @@
 package com.example.querydsl;
 
+import com.example.querydsl.dto.MemberAliasDto;
+import com.example.querydsl.dto.MemberDto;
+import com.example.querydsl.dto.QMemberDto;
 import com.example.querydsl.entity.Member;
 import com.example.querydsl.entity.QMember;
 import com.example.querydsl.entity.QTeam;
 import com.example.querydsl.entity.Team;
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Expression;
+import com.querydsl.core.types.ExpressionUtils;
+import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
@@ -630,5 +637,260 @@ public class QuerydslBasicTest {
         }
     }
 
+    @Test
+    @DisplayName("querydsl_프로젝션결과반환_하나_Test")
+    void querydsl_프로젝션결과반환_하나_Test() {
+        List<String> result = queryFactory
+                                .select(member.username)
+                                .from(member)
+                                .fetch();
 
+        for (String s : result) {
+            System.out.println("s = " + s);
+        }
+    }
+
+    @Test
+    @DisplayName("querydsl_프로젝션결과반환_여러개_tuple_Test")
+    void querydsl_프로젝션결과반환_여러개_tuple_Test() {
+        List<Tuple> result = queryFactory
+                                .select(member.username, member.age)
+                                .from(member)
+                                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+
+            String username = tuple.get(member.username);
+            Integer age = tuple.get(member.age);
+
+            System.out.println("username = " + username);
+            System.out.println("age = " + age);
+        }
+    }
+
+    @Test
+    @DisplayName("querydsl_프로젝션결과반환_순수jpa_dto반환_Test")
+    void querydsl_프로젝션결과반환_순수jpa_dto반환_Test() {
+        String jpql = "select new com.example.querydsl.dto.MemberDto(m.username, m.age) from Member m";
+        List<MemberDto> resultList = em.createQuery(jpql, MemberDto.class).getResultList();
+
+        for (MemberDto memberDto : resultList) {
+            System.out.println("memberDto.getUsername() = " + memberDto.getUsername());
+            System.out.println("memberDto.getAge() = " + memberDto.getAge());
+        }
+    }
+
+    // dto getter, setter, default constructor 필요
+    @Test
+    @DisplayName("querydsl_프로젝션결과반환_querydsl빈생성_프로퍼티접근_Test")
+    void querydsl_프로젝션결과반환_querydsl빈생성_프로퍼티접근_Test() {
+        List<MemberDto> result = queryFactory
+                .select(Projections.bean(MemberDto.class,
+                        member.username,
+                                member.age))
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto.getUsername() = " + memberDto.getUsername());
+            System.out.println("memberDto.getAge() = " + memberDto.getAge());
+        }
+    }
+
+    // dto getter, setter 없어도 됨
+    @Test
+    @DisplayName("querydsl_프로젝션결과반환_querydsl빈생성_필드직접접근 _Test")
+    void querydsl_프로젝션결과반환_querydsl빈생성_필드직접접근() {
+        List<MemberDto> result = queryFactory
+                .select(Projections.fields(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto.getUsername() = " + memberDto.getUsername());
+            System.out.println("memberDto.getAge() = " + memberDto.getAge());
+        }
+    }
+
+    @Test
+    @DisplayName("querydsl_프로젝션결과반환_querydsl빈생성_생성자사용_Test")
+    void querydsl_프로젝션결과반환_querydsl빈생성_생성자사용_Test() {
+        List<MemberDto> result = queryFactory
+                                    .select(Projections.constructor(MemberDto.class,
+                                            member.username,
+                                                    member.age))
+                                    .from(member)
+                                    .fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto.getUsername() = " + memberDto.getUsername());
+            System.out.println("memberDto.getAge() = " + memberDto.getAge());
+        }
+    }
+
+
+    @Test
+    @DisplayName("querydsl_프로젝션결과반환_별칭이다를때_Test")
+    void querydsl_프로젝션결과반환_별칭이다를때_Test() {
+        List<MemberAliasDto> result = queryFactory
+                                        .select(Projections.fields(MemberAliasDto.class,
+                                                member.username.as("name"),
+                                                        ExpressionUtils.as(member.age, "age")))
+                                        .from(member)
+                                        .fetch();
+
+        for (MemberAliasDto memberAliasDto : result) {
+            System.out.println("memberAliasDto.getName() = " + memberAliasDto.getName());
+            System.out.println("memberAliasDto.getAge() = " + memberAliasDto.getAge());
+        }
+    }
+
+
+    @Test
+    @DisplayName("querydsl_프로젝션결과반환_QueryProjection_Test")
+    void querydsl_프로젝션결과반환_QueryProjection_Test() {
+        List<MemberDto> result = queryFactory
+                .select(new QMemberDto(member.username, member.age))
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto.getUsername() = " + memberDto.getUsername());
+            System.out.println("memberDto.getAge() = " + memberDto.getAge());
+        }
+    }
+
+    @Test
+    @DisplayName("querydsl_동적쿼리_BooleanBuilder_Test")
+    void querydsl_동적쿼리_BooleanBuilder_Test() {
+        // given
+        String usernameParameter = "member1";
+        int ageParameter = 10;
+
+        // when
+        List<Member> members = searchMember1(usernameParameter, ageParameter);
+        System.out.println("members = " + members);
+
+        // then
+        Assertions.assertThat(members.size()).isEqualTo(1);
+    }
+
+    private List<Member> searchMember1(String usernameParameter, Integer ageParameter) {
+        BooleanBuilder builder = new BooleanBuilder();
+
+        if(usernameParameter != null) {
+            builder.and(member.username.eq(usernameParameter));
+        }
+
+        if(ageParameter != null) {
+            builder.and(member.age.eq(ageParameter));
+        }
+
+        return queryFactory
+                .selectFrom(member)
+                .where(builder)
+                .fetch();
+    }
+
+    @Test
+    @DisplayName("querydsl_동적쿼리_Where다중파라미터_Test")
+    void querydsl_동적쿼리_Where다중파라미터_Test() {
+        // given
+        String usernameParameter = "member1";
+        int ageParameter = 10;
+
+        // when
+        List<Member> members = searchMember2(usernameParameter, ageParameter);
+        System.out.println("members = " + members);
+
+        // then
+        Assertions.assertThat(members.size()).isEqualTo(1);
+    }
+
+    private List<Member> searchMember2(String usernameParameter, int ageParameter) {
+        return queryFactory
+                .selectFrom(member)
+                .where(usernameEq(usernameParameter), ageEq(ageParameter))
+                .fetch();
+    }
+
+    private BooleanExpression usernameEq(String usernameParameter) {
+        return usernameParameter != null ? member.username.eq(usernameParameter) : null;
+    }
+    private BooleanExpression ageEq(Integer ageParameter) {
+        return ageParameter != null ? member.age.eq(ageParameter) : null;
+    }
+
+    private BooleanExpression allEq(String usernameCond, Integer ageCond) {
+        return usernameEq(usernameCond).and(ageEq(ageCond));
+    }
+
+
+    /**
+     * 비교 표현식 줄임말
+     * eq - equal ( = )
+     * ne - not equal ( <> )
+     * lt - little ( < )
+     * le - little or equal ( <= )
+     * gt - greater ( > )
+     * ge - greater or equal ( >= )
+     */
+    @Test
+    @DisplayName("querydsl_수정_벌크연산_Test")
+    void querydsl_수정_벌크연산_Test() {
+        long count = queryFactory
+                        .update(member)
+                        .set(member.username, "이름_수정")
+                        .where(member.age.lt(28)) // where age < 28
+                        .execute();
+
+        System.out.println("count = " + count);
+    }
+
+    @Test
+    @DisplayName("querydsl_삭제_벌크연산_Test")
+    void querydsl_삭제_벌크연산_Test() {
+        long count = queryFactory
+                        .delete(member)
+                        .where(member.age.gt(18)) // where age > 18
+                        .execute();
+
+        System.out.println("count = " + count);
+    }
+
+    /**
+     * member → M으로 변경하는 replace 함수 사용
+     */
+    @Test
+    @DisplayName("querydsl_SQL_function_호출1_Test")
+    void querydsl_SQL_function_호출1_Test() {
+        List<String> result = queryFactory
+                .select(Expressions.stringTemplate("function('replace', {0}, {1}, {2})", member.username, "member", "M"))
+                .from(member)
+                .fetch();
+
+        for (String s : result) {
+            System.out.println("s = " + s);
+        }
+    }
+
+    /**
+     * 소문자로 변경해서 비교
+     */
+    @Test
+    @DisplayName("querydsl_SQL_function_호출2_Test")
+    void querydsl_SQL_function_호출2_Test() {
+        List<String> result = queryFactory
+                .select(member.username)
+                .from(member)
+                .where(member.username.eq(Expressions.stringTemplate("function('lower', {0})", member.username)))
+                .fetch();
+
+        for (String s : result) {
+            System.out.println("s = " + s);
+        }
+    }
 }
