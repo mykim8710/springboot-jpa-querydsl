@@ -893,4 +893,8 @@ public class QuerydslBasicTest {
             System.out.println("s = " + s);
         }
     }
+
+
+
+
 }

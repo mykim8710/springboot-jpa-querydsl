@@ -2,6 +2,9 @@ server:
   port: 3032
 
 spring:
+  profiles:
+    active: local
+
   # DB Connection 관련
   datasource:
     url: jdbc:h2:tcp://localhost/~/querydsl

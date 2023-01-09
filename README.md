@@ -46,4 +46,14 @@
   - 수정, 삭제 벌크 연산
   - SQL function 호출
 
-- 
+- 실무 활용 : 순수 JPA와 Querydsl
+  - 순수 JPA Repository, Querydsl
+  - 동적 쿼리와 성능 최적화 조회 : Builder 사용 
+  - 동적 쿼리와 성능 최적화 조회 : Where절 파라미터 사용
+
+- 실무 활용 : 스프링 데이터 JPA와 Querydsl
+  - 스프링 데이터 JPA Repository
+  - 사용자 정의 Repository
+  - 스프링 데이터 페이징 활용
+    - Querydsl 페이징 연동
+    - CountQuery 최적화
