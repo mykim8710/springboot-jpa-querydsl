@@ -57,3 +57,16 @@
   - 스프링 데이터 페이징 활용
     - Querydsl 페이징 연동
     - CountQuery 최적화
+
+- 스프링 데이터 JPA가 제공하는 Querydsl 기능
+  - 인터페이스 지원 - QuerydslPredicateExecutor
+  - Querydsl Web
+  - QuerydslRepositorySupport
+  - Querydsl 지원 클래스 직접 정의
+
+- 스프링 부트 2.6 이상, Querydsl 5.0 지원방법
+  - 최신 스프링 부트 2.6부터는 Querydsl 5.0을 사용
+  - 스프링 부트 2.6 이상 사용시 다음과 같은 부분을 확인 필요
+    - 1. `build.gradle` 설정 변경
+    - 2. `PageableExecutionUtils` Deprecated(향후 미지원) 패키지 변경
+    - 3. `Querydsl fetchResults(), fetchCount()` Deprecated(향후 미지원)
